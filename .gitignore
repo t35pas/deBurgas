@@ -1,0 +1,21 @@
+# Archivos/Directorios de Compilación y IDE (VS/VS Code)
+# ------------------------------------
+
+# Directorios de compilación y temporales
+[Bb]in/
+[Oo]bj/
+*.log
+*.pdb
+*.orig
+
+# Archivos de Visual Studio (ocultos o temporales)
+.vs/ # Ignora toda la carpeta .vs/ (que incluye tu applicationhost.config)
+*.suo
+*.user
+*.userosf
+*.sln.docstates
+
+
+**/.vs
+**/bin
+obj/
