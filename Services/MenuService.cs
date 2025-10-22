@@ -1,83 +1,70 @@
-﻿using System;
+﻿// src/Services/MenuService.cs
+using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using deBurgas.Data; // Asume que AppDbContext está aquí
+using deBurgas.Models.Entities; // Asume que tus entidades están aquí
 
-// src/Services/MenuService.cs
+// Nota: Reemplaza TuProyecto.Data y TuProyecto.Models.Entities por tus namespaces reales.
+
 public class MenuService
 {
-    private readonly List<CatalogItem> _catalogItems;
-    private readonly List<Modifier> _modifiers;
-    private readonly List<Option> _options;
+    // Usamos IServiceScopeFactory para resolver el DbContext
+    // Esto es NECESARIO si el servicio se registra como Singleton (que es lo ideal para el menú)
+    private readonly IServiceScopeFactory _scopeFactory;
 
-    public MenuService()
+    public MenuService(IServiceScopeFactory scopeFactory)
     {
-        // --- 1. Definición de Opciones ---
-        var optCheddar = new Option(Guid.NewGuid(), "Cheddar", 0.50m);
-        var optMozzarella = new Option(Guid.NewGuid(), "Mozzarella", 0.75m);
-        var optBbq = new Option(Guid.NewGuid(), "Salsa BBQ", 0.00m);
-        var optPapas = new Option(Guid.NewGuid(), "Papas Grandes", 2.50m);
-
-        _options = new List<Option> { optCheddar, optMozzarella, optBbq, optPapas };
-
-        // --- 2. Definición de Modificadores ---
-        var modQueso = new Modifier(
-            Guid.NewGuid(),
-            "Tipo de Queso",
-            "single", // Solo se puede elegir uno
-            new List<Guid> { optCheddar.OptionId, optMozzarella.OptionId }
-        );
-
-        var modSalsas = new Modifier(
-            Guid.NewGuid(),
-            "Salsas Extras",
-            "multiple", // Permite varias selecciones
-            new List<Guid> { optBbq.OptionId }
-        );
-
-        _modifiers = new List<Modifier> { modQueso, modSalsas };
-
-        // --- 3. Definición del Producto (Hamburguesa) ---
-        var burgerId = Guid.NewGuid();
-        var classicBurger = new CatalogItem(
-            burgerId,
-            "Classic Burger",
-            "BURGER",
-            10.00m,
-            "Nuestra hamburguesa clásica con lechuga y tomate.",
-            "https://example.com/images/classic.jpg",
-            new List<Guid> { modQueso.ModifierId, modSalsas.ModifierId } // Asociamos los modificadores
-        );
-
-        _catalogItems = new List<CatalogItem> { classicBurger };
+        _scopeFactory = scopeFactory;
     }
 
-    // Método para obtener el catálogo completo (incluyendo reglas de configuración)
-    public List<CatalogItem> GetFullCatalog() => _catalogItems;
-    public List<Modifier> GetModifiers() => _modifiers;
-    public List<Option> GetOptions() => _options;
-
-    // Método para obtener el menú completo ensamblado para el frontend
-    public object GetAssembledMenu()
+    /// <summary>
+    /// Método principal para obtener el menú completo ensamblado para el frontend.
+    /// Carga los productos, sus modificadores y sus opciones con una sola consulta eficiente.
+    /// </summary>
+    public async Task<object> GetAssembledMenuAsync()
     {
-        // Esto simula la lógica de unir el Product con sus Modifiers y Options
-        var menu = _catalogItems.Select(item => new
+        // Usamos un nuevo scope para DbContext porque MenuService es Singleton
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        // 1. Cargar todos los datos necesarios en memoria con 'Eager Loading'
+        // Esto es un patrón común para minimizar las consultas a la DB (N+1 problem).
+        var catalogItems = await context.CatalogItems
+            .Include(item => item.ItemModifiers) // Relación M:N
+            .ThenInclude(im => im.Modifier)       // Incluye el Modificador
+            .ThenInclude(m => m.Options)         // Incluye las Opciones del Modificador
+            .ToListAsync();
+
+        // 2. Ensamblar la estructura de respuesta para el Frontend
+        var menu = catalogItems.Select(item => new
         {
             item.ProductId,
             item.Name,
             item.BasePrice,
             item.ProductType,
-            // Ensamblamos los modificadores
-            Modifiers = item.ModifierIds
-                .Select(id => _modifiers.Find(m => m.ModifierId == id))
-                .Where(m => m != null)
+            item.Description,
+            item.ImageUrl,
+            // Ensamblamos los modificadores a partir de la relación M:N
+            Modifiers = item.ItemModifiers
+                .Select(im => im.Modifier)
+                .Where(mod => mod != null)
                 .Select(mod => new
                 {
                     mod.ModifierId,
                     mod.Name,
                     mod.SelectionType,
-                    Options = mod.OptionIds
-                        .Select(optId => _options.Find(o => o.OptionId == optId))
-                        .Where(o => o != null)
+                    // Las Opciones ya vienen cargadas dentro del Modificador
+                    Options = mod.Options.Select(opt => new
+                    {
+                        opt.OptionId,
+                        opt.Name,
+                        opt.AdditionalPrice
+                    })
                 })
+                .ToList()
         }).ToList();
 
         return menu;

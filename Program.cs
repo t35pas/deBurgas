@@ -1,7 +1,16 @@
+using deBurgas.Data;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Npgsql.EntityFrameworkCore.PostgreSQL;
+using System;
 
 // 1. Configuración de la Aplicación
 var builder = WebApplication.CreateBuilder(args);
+
+// Conexion con DB
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(connectionString));
 
 // 1. Agregar Servicios: Registro de los controladores y Swagger
 builder.Services.AddControllers(); // <-- ¡Asegura que esto esté aquí!

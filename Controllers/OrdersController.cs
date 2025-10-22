@@ -1,4 +1,5 @@
 ﻿// Controllers/OrdersController.cs
+using deBurgas.Entities;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json; // Importante para la serialización
 

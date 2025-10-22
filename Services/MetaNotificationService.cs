@@ -1,4 +1,6 @@
 ﻿// Services/MetaNotificationService.cs
+using deBurgas.Models;
+
 public class MetaNotificationService
 {
     // Simula el envío de un mensaje de WhatsApp

@@ -1,4 +1,6 @@
 ﻿// Controllers/AdminController.cs
+using deBurgas.Entities;
+using deBurgas.Models;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
